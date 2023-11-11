@@ -1,16 +1,18 @@
 import { useState, useCallback, useEffect } from 'react';
+import { DownloadCloud } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import removeBackground from '@imgly/background-removal';
-import { DownloadCloud } from 'lucide-react';
 
-import { Button } from './components/ui/button';
 import { cn } from './lib/utils';
+import { Button } from './components/ui/button';
+import { ViewError } from './components/view-error';
 
 type Img = File & { preview: string; working?: boolean; processed?: string };
 
 function App() {
   const [files, setFiles] = useState<Img[]>([]);
-  const [processing, setProcessing] = useState<string | undefined>(undefined);
+  const [processing, setProcessing] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
   const onDrop = useCallback((acceptedFiles: File[]) => {
     // heic & heic2any
     // preload from background-removal ?
@@ -38,28 +40,38 @@ function App() {
   }, []);
 
   const doTheThing = async () => {
-    if (files) {
-      for (const file of files) {
-        setProcessing(file.name);
-        const buffer = await file.arrayBuffer();
-        const blob = await removeBackground(buffer, {
-          output: {
-            quality: 0.8,
-            type: 'foreground',
-            format: 'image/png',
-          },
-        });
-        file.processed = URL.createObjectURL(blob);
-        setProcessing(undefined);
+    try {
+      if (files) {
+        for (const file of files) {
+          setProcessing(file.name);
+          const buffer = await file.arrayBuffer();
+          const blob = await removeBackground(buffer, {
+            output: {
+              quality: 0.8,
+              type: 'foreground',
+              format: 'image/png',
+            },
+          });
+          file.processed = URL.createObjectURL(blob);
+          setProcessing(undefined);
+        }
       }
+    } catch (e) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError(e?.toString() || 'Unknown error');
+      }
+    } finally {
+      setProcessing(undefined);
     }
   };
 
   return (
-    <section className="container text-center mt-10">
+    <section className="container text-center mt-2 md:mt-10">
       <h1 className="font-bold text-xl uppercase">Background Remover</h1>
       <div
-        className="mx-10 mt-10 p-5 border bg-slate-100 h-48 flex items-center text-slate-400"
+        className="mx-2 mt-5 md:mx-10 md:mt-10 p-5 border bg-slate-100 md:h-48 flex items-center text-slate-400"
         {...getRootProps()}
       >
         <input {...getInputProps()} />
@@ -80,11 +92,16 @@ function App() {
           Do The Thing!
         </Button>
       </div>
+      {error ? (
+        <div className="flex flex-wrap gap-2 justify-center">
+          <ViewError error={error} className="mb-10 mx-2 md:mx-10 w-2/3 md:w-1/3" />
+        </div>
+      ) : null}
       <div className="flex flex-wrap gap-2 justify-center">
         {files.map((img) => (
           <div
             key={img.name}
-            className="p-2 border border-2 border-solid border-black relative"
+            className="p-2 border-2 border-solid border-black relative"
           >
             <img
               className="object-scale-down w-48 h-48"
